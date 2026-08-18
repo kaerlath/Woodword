@@ -1,0 +1,28 @@
+[
+  {
+    "Author": "Lynnaes Krasikaz",
+    "Name": "Woodword",
+    "InternalName": "Woodword",
+    "AssemblyVersion": "0.2.0.0",
+    "Description": "A focused roleplay translation tool for Common and Vieran. Open it with /woodword. Woodword never intercepts or posts chat.",
+    "ApplicableVersion": "any",
+    "RepoUrl": "https://github.com/kaerlath/Woodword",
+    "Tags": [
+      "roleplay",
+      "translation",
+      "viera"
+    ],
+    "DalamudApiLevel": 15,
+    "LoadRequiredState": 0,
+    "LoadSync": false,
+    "CanUnloadAsync": false,
+    "LoadPriority": 0,
+    "IconUrl": "https://raw.githubusercontent.com/kaerlath/Woodword/main/images/icon.png",
+    "Punchline": "Render words between Common and Vieran.",
+    "AcceptsFeedback": true,
+    "IsHide": false,
+    "IsTestingExclusive": false,
+    "DownloadLinkInstall": "https://github.com/kaerlath/Woodword/releases/download/v0.2.0/Woodword-v0.2.0.zip",
+    "DownloadLinkUpdate": "https://github.com/kaerlath/Woodword/releases/download/v0.2.0/Woodword-v0.2.0.zip"
+  }
+]

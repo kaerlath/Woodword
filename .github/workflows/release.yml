@@ -6,7 +6,7 @@ on:
       release_tag:
         description: Existing tag to publish
         required: true
-        default: v0.1.0
+        default: v0.2.0
   push:
     tags:
       - "v*"
@@ -47,11 +47,15 @@ jobs:
             exit 1
           fi
 
+      - name: Resolve release version
+        shell: bash
+        run: echo "RELEASE_VERSION=${RELEASE_TAG#v}" >> "${GITHUB_ENV}"
+
       - name: Restore locked dependencies
         run: dotnet restore Woodword/Woodword.csproj --locked-mode
 
       - name: Build packaged plugin
-        run: dotnet build Woodword/Woodword.csproj --configuration Release --no-restore
+        run: dotnet build Woodword/Woodword.csproj --configuration Release --no-restore --property:Version="${RELEASE_VERSION}"
 
       - name: Publish GitHub release
         shell: bash

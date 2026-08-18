@@ -34,16 +34,16 @@ Replace `YOUR-GITHUB-NAME` with the account or organization that owns the reposi
 
 The value is injected into release builds by GitHub Actions. It is not committed to source. It will, however, be present inside the distributed DLL and must be treated as an application token rather than an unrecoverable secret.
 
-## Publish the first release
+## Publish a release
 
 Create and push a version tag:
 
 ```powershell
-git tag -a v0.1.0 -m "Woodword v0.1.0"
-git push origin v0.1.0
+git tag -a v0.2.0 -m "Woodword v0.2.0"
+git push origin v0.2.0
 ```
 
-The **Publish release** workflow will build Woodword, package it, and create the GitHub release automatically. Follow its progress under the repository's **Actions** tab. When it completes, the release and downloadable plugin ZIP appear under **Releases**.
+The **Publish release** workflow will build Woodword, package it, and create the GitHub release automatically. Follow its progress under the repository's **Actions** tab. When it completes, the release and downloadable plugin ZIP appear under **Releases**. Keep `repo.json` synchronized with the release version and asset URL.
 
 ## Before each later release
 

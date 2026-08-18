@@ -30,6 +30,16 @@ Development builds contain no relay token. Enter one through **Woodword Settings
 
 See [RELEASING.md](RELEASING.md) for the GitHub release process.
 
+## Install through Dalamud
+
+After the v0.2.0 release is published, add this URL under **Dalamud Settings → Experimental → Custom Plugin Repositories**:
+
+```text
+https://raw.githubusercontent.com/kaerlath/Woodword/main/repo.json
+```
+
+Then search for **Woodword** in the plugin installer.
+
 ## Privacy and behavior
 
 - Translation occurs only after the user presses a translation button.

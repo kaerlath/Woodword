@@ -11,12 +11,18 @@ public sealed class MainWindow : Window, IDisposable
 {
     private static readonly Vector4 Moss = new(0.42f, 0.62f, 0.38f, 1f);
     private static readonly Vector4 PaleMoss = new(0.68f, 0.78f, 0.58f, 1f);
-    private static readonly Vector4 DeepWood = new(0.045f, 0.065f, 0.052f, 0.94f);
+    private static readonly Vector4 DeepWood = new(0.035f, 0.052f, 0.04f, 0.72f);
     private static readonly Vector4 Gold = new(0.78f, 0.64f, 0.36f, 1f);
+    private static readonly Vector4 ButtonGreen = new(0.17f, 0.29f, 0.17f, 1f);
+    private static readonly Vector4 ButtonHover = new(0.25f, 0.4f, 0.23f, 1f);
+    private const float PanelGutter = 46f;
 
     private readonly Plugin plugin;
     private readonly TranslationService translationService;
     private readonly SettingsWindow settingsWindow;
+    private readonly string backgroundPath;
+    private readonly string vinePath;
+    private readonly string ravenPath;
     private readonly ConcurrentQueue<Action> uiUpdates = new();
     private readonly CancellationTokenSource lifetimeCancellation = new();
     private CancellationTokenSource? commonRequestCancellation;
@@ -31,14 +37,27 @@ public sealed class MainWindow : Window, IDisposable
     private bool vieranBusy;
     private bool commonInputActive;
     private bool vieranInputActive;
+    private int commonCursorPosition;
+    private int vieranCursorPosition;
+    private int commonPendingCursor = -1;
+    private int vieranPendingCursor = -1;
     private bool disposed;
 
-    public MainWindow(Plugin plugin, TranslationService translationService, SettingsWindow settingsWindow)
+    public MainWindow(
+        Plugin plugin,
+        TranslationService translationService,
+        SettingsWindow settingsWindow,
+        string backgroundPath,
+        string vinePath,
+        string ravenPath)
         : base("Woodword##WoodwordMain")
     {
         this.plugin = plugin;
         this.translationService = translationService;
         this.settingsWindow = settingsWindow;
+        this.backgroundPath = backgroundPath;
+        this.vinePath = vinePath;
+        this.ravenPath = ravenPath;
         Size = new Vector2(780, 690);
         SizeCondition = ImGuiCond.FirstUseEver;
         SizeConstraints = new WindowSizeConstraints
@@ -52,13 +71,19 @@ public sealed class MainWindow : Window, IDisposable
     {
         while (uiUpdates.TryDequeue(out var update)) update();
 
-        ImGui.TextColored(PaleMoss, "THE WOODWORD");
+        DrawBackground();
+        PushWoodwordControls();
+
+        DrawRavenHeaderIcon();
         ImGui.SameLine();
-        ImGui.TextColored(Gold, "The Wood listens, and meaning takes root.");
-        ImGui.SameLine(ImGui.GetWindowWidth() - 82);
+        ImGui.TextColored(Gold, "WOODWORD");
+        ImGui.SameLine();
+        ImGui.TextColored(PaleMoss, "  The Wood listens, and meaning takes root.");
+        ImGui.SameLine(ImGui.GetWindowWidth() - 137);
+        ImGui.TextDisabled(BuildInformation.DisplayVersion);
+        ImGui.SameLine();
         if (ImGui.Button("Settings")) settingsWindow.IsOpen = true;
-        ImGui.Separator();
-        ImGui.TextDisabled("THE TWO TONGUES");
+        DrawOrnamentalRule();
 
         var available = ImGui.GetContentRegionAvail();
         var panelHeight = MathF.Max(210, (available.Y - ImGui.GetStyle().ItemSpacing.Y) / 2);
@@ -68,6 +93,96 @@ public sealed class MainWindow : Window, IDisposable
         DrawPanel("VIERAN  \u2192  COMMON", "Words offered in Vieran", "Meaning returned in Common",
             "Translate into Common", "vieran", ref vieranInput, ref commonOutput,
             ref vieranStatus, ref vieranBusy, TranslationDirection.VieranToCommon, panelHeight, false);
+        PopWoodwordControls();
+    }
+
+    private void DrawRavenHeaderIcon()
+    {
+        const float iconSize = 30f;
+        var texture = Plugin.TextureProvider.GetFromFile(ravenPath).GetWrapOrDefault();
+        if (texture is not null)
+        {
+            var position = ImGui.GetCursorScreenPos() + new Vector2(0, -7);
+            var drawList = ImGui.GetWindowDrawList();
+            var center = position + new Vector2(iconSize / 2f);
+
+            // A pale moon disc keeps the blue-black raven legible against the forest.
+            drawList.AddCircleFilled(
+                center,
+                iconSize / 2f,
+                ImGui.GetColorU32(new Vector4(0.62f, 0.69f, 0.72f, 0.94f)),
+                32);
+            drawList.AddCircle(
+                center,
+                iconSize / 2f,
+                ImGui.GetColorU32(new Vector4(0.72f, 0.61f, 0.27f, 0.95f)),
+                32,
+                1.25f);
+            drawList.AddImage(
+                texture.Handle,
+                position + new Vector2(1f),
+                position + new Vector2(iconSize - 1f),
+                Vector2.Zero,
+                Vector2.One,
+                ImGui.GetColorU32(Vector4.One));
+        }
+        ImGui.Dummy(new Vector2(iconSize + 2, ImGui.GetTextLineHeight()));
+    }
+
+    private void DrawBackground()
+    {
+        var texture = Plugin.TextureProvider.GetFromFile(backgroundPath).GetWrapOrDefault();
+        if (texture is null) return;
+
+        var drawList = ImGui.GetWindowDrawList();
+        var position = ImGui.GetWindowPos();
+        var size = ImGui.GetWindowSize();
+        drawList.AddImage(
+            texture.Handle,
+            position,
+            position + size,
+            Vector2.Zero,
+            Vector2.One,
+            ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 0.72f)));
+        drawList.AddRectFilled(
+            position,
+            position + size,
+            ImGui.GetColorU32(new Vector4(0.015f, 0.025f, 0.018f, 0.16f)));
+    }
+
+    private static void DrawOrnamentalRule()
+    {
+        var drawList = ImGui.GetWindowDrawList();
+        var start = ImGui.GetCursorScreenPos();
+        var end = start + new Vector2(ImGui.GetContentRegionAvail().X, 0);
+        var center = (start + end) / 2;
+        var color = ImGui.GetColorU32(new Vector4(Gold.X, Gold.Y, Gold.Z, 0.6f));
+        drawList.AddLine(start, center - new Vector2(8, 0), color, 1f);
+        drawList.AddLine(center + new Vector2(8, 0), end, color, 1f);
+        drawList.AddQuadFilled(
+            center + new Vector2(0, -4),
+            center + new Vector2(4, 0),
+            center + new Vector2(0, 4),
+            center + new Vector2(-4, 0),
+            color);
+        ImGui.Dummy(new Vector2(0, 8));
+    }
+
+    private static void PushWoodwordControls()
+    {
+        ImGui.PushStyleColor(ImGuiCol.Button, ButtonGreen);
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, ButtonHover);
+        ImGui.PushStyleColor(ImGuiCol.ButtonActive, Moss);
+        ImGui.PushStyleColor(ImGuiCol.FrameBg, new Vector4(0.055f, 0.07f, 0.055f, 0.94f));
+        ImGui.PushStyleColor(ImGuiCol.FrameBgHovered, new Vector4(0.075f, 0.1f, 0.07f, 0.98f));
+        ImGui.PushStyleColor(ImGuiCol.FrameBgActive, new Vector4(0.09f, 0.12f, 0.08f, 1f));
+        ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 4f);
+    }
+
+    private static void PopWoodwordControls()
+    {
+        ImGui.PopStyleVar();
+        ImGui.PopStyleColor(6);
     }
 
     private void DrawPanel(
@@ -76,9 +191,12 @@ public sealed class MainWindow : Window, IDisposable
         TranslationDirection direction, float height, bool showCopy)
     {
         ImGui.PushStyleColor(ImGuiCol.ChildBg, DeepWood);
-        ImGui.PushStyleColor(ImGuiCol.Border, Moss);
+        ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(Moss.X, Moss.Y, Moss.Z, 0.58f));
         ImGui.PushStyleVar(ImGuiStyleVar.ChildRounding, 6f);
         ImGui.PushStyleVar(ImGuiStyleVar.ChildBorderSize, 1f);
+
+        var panelPosition = ImGui.GetCursorScreenPos();
+        var panelSize = new Vector2(ImGui.GetContentRegionAvail().X, height);
 
         if (!ImGui.BeginChild($"{id}Panel", new Vector2(0, height), true))
         {
@@ -88,21 +206,61 @@ public sealed class MainWindow : Window, IDisposable
             return;
         }
 
+        ImGui.Indent(PanelGutter);
         ImGui.TextColored(PaleMoss, heading);
         ImGui.TextDisabled($"{inputLabel}  |  {input.Length}/{TranslationService.MaximumTextLength}");
         var boxHeight = MathF.Max(54, (height - 132) / 2);
-        var inputWidth = MathF.Max(100, ImGui.GetContentRegionAvail().X - 12);
+        var inputWidth = MathF.Max(100, ImGui.GetContentRegionAvail().X - PanelGutter - 12);
         ref var inputActive = ref direction == TranslationDirection.CommonToVieran
             ? ref commonInputActive
             : ref vieranInputActive;
         if (!inputActive) input = WrapForDisplay(input, inputWidth);
         ImGui.InputTextMultiline($"##{id}Input", ref input, TranslationService.MaximumTextLength + 1,
-            new Vector2(-1, boxHeight));
+            new Vector2(-PanelGutter, boxHeight), ImGuiInputTextFlags.CallbackAlways, data =>
+            {
+                if (direction == TranslationDirection.CommonToVieran)
+                {
+                    if (commonPendingCursor >= 0)
+                    {
+                        data.CursorPos = commonPendingCursor;
+                        data.SelectionStart = commonPendingCursor;
+                        data.SelectionEnd = commonPendingCursor;
+                        commonPendingCursor = -1;
+                    }
+                    commonCursorPosition = data.CursorPos;
+                }
+                else
+                {
+                    if (vieranPendingCursor >= 0)
+                    {
+                        data.CursorPos = vieranPendingCursor;
+                        data.SelectionStart = vieranPendingCursor;
+                        data.SelectionEnd = vieranPendingCursor;
+                        vieranPendingCursor = -1;
+                    }
+                    vieranCursorPosition = data.CursorPos;
+                }
+                return 0;
+            });
         inputActive = ImGui.IsItemActive();
-        if (!inputActive) input = WrapForDisplay(input, inputWidth);
+        if (ImGui.IsItemEdited())
+        {
+            var cursor = direction == TranslationDirection.CommonToVieran
+                ? commonCursorPosition
+                : vieranCursorPosition;
+            var logicalCursor = CountLogicalCharacters(input, cursor);
+            input = WrapForDisplay(input, inputWidth);
+            var displayCursor = FindDisplayCursor(input, logicalCursor);
+            if (direction == TranslationDirection.CommonToVieran) commonPendingCursor = displayCursor;
+            else vieranPendingCursor = displayCursor;
+        }
+        else if (!inputActive)
+        {
+            input = WrapForDisplay(input, inputWidth);
+        }
         ImGui.TextDisabled(outputLabel);
         ImGui.PushStyleColor(ImGuiCol.ChildBg, new Vector4(0.08f, 0.085f, 0.075f, 1f));
-        if (ImGui.BeginChild($"{id}Output", new Vector2(-1, boxHeight), true))
+        if (ImGui.BeginChild($"{id}Output", new Vector2(-PanelGutter, boxHeight), true))
             ImGui.TextWrapped(string.IsNullOrEmpty(output) ? "The Wood has not yet answered." : output);
         ImGui.EndChild();
         ImGui.PopStyleColor();
@@ -131,9 +289,35 @@ public sealed class MainWindow : Window, IDisposable
 
         ImGui.SameLine();
         ImGui.TextColored(Gold, status);
+        ImGui.Unindent(PanelGutter);
         ImGui.EndChild();
+        DrawVineCorners(panelPosition, panelSize);
         ImGui.PopStyleVar(2);
         ImGui.PopStyleColor(2);
+    }
+
+    private void DrawVineCorners(Vector2 position, Vector2 size)
+    {
+        var texture = Plugin.TextureProvider.GetFromFile(vinePath).GetWrapOrDefault();
+        if (texture is null) return;
+
+        var drawList = ImGui.GetWindowDrawList();
+        var ornamentSize = new Vector2(126, 126);
+        var tint = ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 0.86f));
+        drawList.AddImage(texture.Handle, position, position + ornamentSize,
+            new Vector2(0, 1), new Vector2(1, 0), tint);
+        drawList.AddImage(texture.Handle,
+            position + new Vector2(size.X - ornamentSize.X, 0),
+            position + new Vector2(size.X, ornamentSize.Y),
+            Vector2.One, Vector2.Zero, tint);
+        drawList.AddImage(texture.Handle,
+            position + new Vector2(0, size.Y - ornamentSize.Y),
+            position + new Vector2(ornamentSize.X, size.Y),
+            Vector2.Zero, Vector2.One, tint);
+        drawList.AddImage(texture.Handle,
+            position + size - ornamentSize,
+            position + size,
+            new Vector2(1, 0), new Vector2(0, 1), tint);
     }
 
     private void StartTranslation(TranslationDirection direction, string input)
@@ -242,6 +426,28 @@ public sealed class MainWindow : Window, IDisposable
             wrapped.Add(string.Join('\n', lines));
         }
         return string.Join("\n\n", wrapped);
+    }
+
+    private static int CountLogicalCharacters(string text, int displayCursor)
+    {
+        var count = 0;
+        for (var index = 0; index < Math.Min(displayCursor, text.Length); index++)
+        {
+            if (text[index] != '\r' && text[index] != '\n') count++;
+        }
+        return count;
+    }
+
+    private static int FindDisplayCursor(string text, int logicalCursor)
+    {
+        var logical = 0;
+        for (var index = 0; index < text.Length; index++)
+        {
+            if (text[index] == '\r' || text[index] == '\n') continue;
+            if (logical == logicalCursor) return index;
+            logical++;
+        }
+        return text.Length;
     }
 
     private void QueueStatus(TranslationDirection direction, string value) => uiUpdates.Enqueue(() =>

@@ -3,6 +3,7 @@ using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using Dalamud.Interface.Textures;
 using Woodword.Services;
 using Woodword.Windows;
 
@@ -15,6 +16,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
     [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
+    [PluginService] internal static ITextureProvider TextureProvider { get; private set; } = null!;
 
     private readonly WindowSystem windowSystem = new("Woodword");
     private readonly TranslationService translationService;
@@ -32,7 +34,17 @@ public sealed class Plugin : IDalamudPlugin
 
         translationService = new TranslationService();
         settingsWindow = new SettingsWindow(this);
-        mainWindow = new MainWindow(this, translationService, settingsWindow);
+        var backgroundPath = Path.Combine(
+            PluginInterface.AssemblyLocation.Directory?.FullName ?? string.Empty,
+            "Assets", "woodword-background-v2.png");
+        var vinePath = Path.Combine(
+            PluginInterface.AssemblyLocation.Directory?.FullName ?? string.Empty,
+            "Assets", "vine-corner.png");
+        var ravenPath = Path.Combine(
+            PluginInterface.AssemblyLocation.Directory?.FullName ?? string.Empty,
+            "Assets", "raven-header-v3.png");
+        mainWindow = new MainWindow(
+            this, translationService, settingsWindow, backgroundPath, vinePath, ravenPath);
         windowSystem.AddWindow(mainWindow);
         windowSystem.AddWindow(settingsWindow);
 
