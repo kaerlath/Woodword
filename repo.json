@@ -22,7 +22,7 @@
     "AcceptsFeedback": true,
     "IsHide": false,
     "IsTestingExclusive": false,
-    "DownloadLinkInstall": "https://github.com/kaerlath/Woodword/releases/download/v0.2.0/Woodword-v0.2.0.zip",
-    "DownloadLinkUpdate": "https://github.com/kaerlath/Woodword/releases/download/v0.2.0/Woodword-v0.2.0.zip"
+    "DownloadLinkInstall": "https://github.com/kaerlath/Woodword/releases/download/v0.2.0/latest.zip",
+    "DownloadLinkUpdate": "https://github.com/kaerlath/Woodword/releases/download/v0.2.0/latest.zip"
   }
 ]
