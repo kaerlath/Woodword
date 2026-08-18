@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Numerics;
+using System.Text;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 using Woodword.Models;
@@ -37,10 +38,6 @@ public sealed class MainWindow : Window, IDisposable
     private bool vieranBusy;
     private bool commonInputActive;
     private bool vieranInputActive;
-    private int commonCursorPosition;
-    private int vieranCursorPosition;
-    private int commonPendingCursor = -1;
-    private int vieranPendingCursor = -1;
     private bool disposed;
 
     public MainWindow(
@@ -208,53 +205,18 @@ public sealed class MainWindow : Window, IDisposable
 
         ImGui.Indent(PanelGutter);
         ImGui.TextColored(PaleMoss, heading);
-        ImGui.TextDisabled($"{inputLabel}  |  {input.Length}/{TranslationService.MaximumTextLength}");
+        ImGui.TextDisabled($"{inputLabel}  |  {UnwrapDisplayText(input).Length}/{TranslationService.MaximumTextLength}");
         var boxHeight = MathF.Max(54, (height - 132) / 2);
         var inputWidth = MathF.Max(100, ImGui.GetContentRegionAvail().X - PanelGutter - 12);
         ref var inputActive = ref direction == TranslationDirection.CommonToVieran
             ? ref commonInputActive
             : ref vieranInputActive;
         if (!inputActive) input = WrapForDisplay(input, inputWidth);
-        ImGui.InputTextMultiline($"##{id}Input", ref input, TranslationService.MaximumTextLength + 1,
-            new Vector2(-PanelGutter, boxHeight), ImGuiInputTextFlags.CallbackAlways, data =>
-            {
-                if (direction == TranslationDirection.CommonToVieran)
-                {
-                    if (commonPendingCursor >= 0)
-                    {
-                        data.CursorPos = commonPendingCursor;
-                        data.SelectionStart = commonPendingCursor;
-                        data.SelectionEnd = commonPendingCursor;
-                        commonPendingCursor = -1;
-                    }
-                    commonCursorPosition = data.CursorPos;
-                }
-                else
-                {
-                    if (vieranPendingCursor >= 0)
-                    {
-                        data.CursorPos = vieranPendingCursor;
-                        data.SelectionStart = vieranPendingCursor;
-                        data.SelectionEnd = vieranPendingCursor;
-                        vieranPendingCursor = -1;
-                    }
-                    vieranCursorPosition = data.CursorPos;
-                }
-                return 0;
-            });
+        ImGui.InputTextMultiline($"##{id}Input", ref input, TranslationService.MaximumTextLength + 512,
+            new Vector2(-PanelGutter, boxHeight), ImGuiInputTextFlags.CallbackEdit,
+            data => WrapDuringEdit(data, inputWidth));
         inputActive = ImGui.IsItemActive();
-        if (ImGui.IsItemEdited())
-        {
-            var cursor = direction == TranslationDirection.CommonToVieran
-                ? commonCursorPosition
-                : vieranCursorPosition;
-            var logicalCursor = CountLogicalCharacters(input, cursor);
-            input = WrapForDisplay(input, inputWidth);
-            var displayCursor = FindDisplayCursor(input, logicalCursor);
-            if (direction == TranslationDirection.CommonToVieran) commonPendingCursor = displayCursor;
-            else vieranPendingCursor = displayCursor;
-        }
-        else if (!inputActive)
+        if (!inputActive)
         {
             input = WrapForDisplay(input, inputWidth);
         }
@@ -402,30 +364,57 @@ public sealed class MainWindow : Window, IDisposable
 
     private static string WrapForDisplay(string text, float width)
     {
-        var paragraphs = NormalizeForTranslation(text).Split("\n\n", StringSplitOptions.None);
+        var paragraphs = UnwrapDisplayText(text).Split("\n\n", StringSplitOptions.None);
         var wrapped = new List<string>(paragraphs.Length);
         foreach (var paragraph in paragraphs)
         {
-            var words = paragraph.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             var lines = new List<string>();
-            var line = string.Empty;
-            foreach (var word in words)
+            var line = new StringBuilder();
+            var tokenStart = 0;
+            while (tokenStart < paragraph.Length)
             {
-                var candidate = line.Length == 0 ? word : $"{line} {word}";
-                if (line.Length > 0 && ImGui.CalcTextSize(candidate).X > width)
+                var isWhitespace = char.IsWhiteSpace(paragraph[tokenStart]);
+                var tokenEnd = tokenStart + 1;
+                while (tokenEnd < paragraph.Length && char.IsWhiteSpace(paragraph[tokenEnd]) == isWhitespace)
+                    tokenEnd++;
+
+                var token = paragraph[tokenStart..tokenEnd];
+                if (!isWhitespace && line.Length > 0 &&
+                    ImGui.CalcTextSize(line.ToString() + token).X > width)
                 {
-                    lines.Add(line);
-                    line = word;
+                    lines.Add(line.ToString().TrimEnd());
+                    line.Clear();
                 }
-                else
-                {
-                    line = candidate;
-                }
+                line.Append(token);
+                tokenStart = tokenEnd;
             }
-            if (line.Length > 0) lines.Add(line);
+            if (line.Length > 0 || paragraph.Length == 0) lines.Add(line.ToString());
             wrapped.Add(string.Join('\n', lines));
         }
         return string.Join("\n\n", wrapped);
+    }
+
+    private static string UnwrapDisplayText(string text) => string.Join("\n\n",
+        text.Replace("\r", string.Empty)
+            .Split("\n\n", StringSplitOptions.None)
+            .Select(paragraph => paragraph.Replace('\n', ' ')));
+
+    private static int WrapDuringEdit(ImGuiInputTextCallbackDataPtr data, float width)
+    {
+        var text = Encoding.UTF8.GetString(data.BufTextSpan);
+        var cursorText = Encoding.UTF8.GetString(data.BufTextSpan[..Math.Min(data.CursorPos, data.BufTextLen)]);
+        var logicalCursor = cursorText.Count(character => character != '\r' && character != '\n');
+        var wrapped = WrapForDisplay(text, width);
+        if (wrapped == text) return 0;
+
+        data.DeleteChars(0, data.BufTextLen);
+        data.InsertChars(0, wrapped);
+        var displayCharacterCursor = FindDisplayCursor(wrapped, logicalCursor);
+        var displayByteCursor = Encoding.UTF8.GetByteCount(wrapped.AsSpan(0, displayCharacterCursor));
+        data.CursorPos = displayByteCursor;
+        data.SelectionStart = displayByteCursor;
+        data.SelectionEnd = displayByteCursor;
+        return 0;
     }
 
     private static int CountLogicalCharacters(string text, int displayCursor)

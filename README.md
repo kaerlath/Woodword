@@ -32,7 +32,7 @@ See [RELEASING.md](RELEASING.md) for the GitHub release process.
 
 ## Install through Dalamud
 
-After the v0.2.0 release is published, add this URL under **Dalamud Settings → Experimental → Custom Plugin Repositories**:
+Add this URL under **Dalamud Settings → Experimental → Custom Plugin Repositories**:
 
 ```text
 https://raw.githubusercontent.com/kaerlath/Woodword/main/repo.json
