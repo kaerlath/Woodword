@@ -1,6 +1,12 @@
 name: Publish release
 
 on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing tag to publish
+        required: true
+        default: v0.1.0
   push:
     tags:
       - "v*"
@@ -12,8 +18,9 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      DALAMUD_HOME: ${{ runner.temp }}/dalamud
+      DALAMUD_HOME: /tmp/dalamud
       WOODWORD_RELAY_TOKEN: ${{ secrets.WOODWORD_RELAY_TOKEN }}
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
     steps:
       - name: Check out source
         uses: actions/checkout@v5
@@ -48,7 +55,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" \
-            "Woodword/bin/Release/Woodword/latest.zip#Woodword-${GITHUB_REF_NAME}.zip" \
-            --title "Woodword ${GITHUB_REF_NAME}" \
+          gh release create "${RELEASE_TAG}" \
+            "Woodword/bin/Release/Woodword/latest.zip#Woodword-${RELEASE_TAG}.zip" \
+            --title "Woodword ${RELEASE_TAG}" \
             --generate-notes
