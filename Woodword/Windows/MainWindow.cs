@@ -17,12 +17,14 @@ public sealed class MainWindow : Window, IDisposable
     private static readonly Vector4 ButtonGreen = new(0.17f, 0.29f, 0.17f, 1f);
     private static readonly Vector4 ButtonHover = new(0.25f, 0.4f, 0.23f, 1f);
     private const float PanelGutter = 46f;
+    private const float BotanicalOutputLabelInset = 52f;
 
     private readonly Plugin plugin;
     private readonly TranslationService translationService;
     private readonly SettingsWindow settingsWindow;
     private readonly string backgroundPath;
-    private readonly string vinePath;
+    private readonly string panelTopPath;
+    private readonly string panelBottomPath;
     private readonly string ravenPath;
     private readonly ConcurrentQueue<Action> uiUpdates = new();
     private readonly CancellationTokenSource lifetimeCancellation = new();
@@ -45,7 +47,8 @@ public sealed class MainWindow : Window, IDisposable
         TranslationService translationService,
         SettingsWindow settingsWindow,
         string backgroundPath,
-        string vinePath,
+        string panelTopPath,
+        string panelBottomPath,
         string ravenPath)
         : base("Woodword##WoodwordMain")
     {
@@ -53,7 +56,8 @@ public sealed class MainWindow : Window, IDisposable
         this.translationService = translationService;
         this.settingsWindow = settingsWindow;
         this.backgroundPath = backgroundPath;
-        this.vinePath = vinePath;
+        this.panelTopPath = panelTopPath;
+        this.panelBottomPath = panelBottomPath;
         this.ravenPath = ravenPath;
         Size = new Vector2(780, 690);
         SizeCondition = ImGuiCond.FirstUseEver;
@@ -203,9 +207,12 @@ public sealed class MainWindow : Window, IDisposable
             return;
         }
 
+        DrawPanelBotanicals(panelPosition, panelSize);
         ImGui.Indent(PanelGutter);
-        ImGui.TextColored(PaleMoss, heading);
-        ImGui.TextDisabled($"{inputLabel}  |  {UnwrapDisplayText(input).Length}/{TranslationService.MaximumTextLength}");
+        DrawRightAlignedHeader(heading, PaleMoss);
+        DrawRightAlignedHeader(
+            $"{inputLabel}  |  {UnwrapDisplayText(input).Length}/{TranslationService.MaximumTextLength}",
+            ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]);
         var boxHeight = MathF.Max(54, (height - 132) / 2);
         var inputWidth = MathF.Max(100, ImGui.GetContentRegionAvail().X - PanelGutter - 12);
         ref var inputActive = ref direction == TranslationDirection.CommonToVieran
@@ -220,7 +227,9 @@ public sealed class MainWindow : Window, IDisposable
         {
             input = WrapForDisplay(input, inputWidth);
         }
+        ImGui.Indent(BotanicalOutputLabelInset);
         ImGui.TextDisabled(outputLabel);
+        ImGui.Unindent(BotanicalOutputLabelInset);
         ImGui.PushStyleColor(ImGuiCol.ChildBg, new Vector4(0.08f, 0.085f, 0.075f, 1f));
         if (ImGui.BeginChild($"{id}Output", new Vector2(-PanelGutter, boxHeight), true))
             ImGui.TextWrapped(string.IsNullOrEmpty(output) ? "The Wood has not yet answered." : output);
@@ -253,33 +262,40 @@ public sealed class MainWindow : Window, IDisposable
         ImGui.TextColored(Gold, status);
         ImGui.Unindent(PanelGutter);
         ImGui.EndChild();
-        DrawVineCorners(panelPosition, panelSize);
         ImGui.PopStyleVar(2);
         ImGui.PopStyleColor(2);
     }
 
-    private void DrawVineCorners(Vector2 position, Vector2 size)
+    private void DrawPanelBotanicals(Vector2 position, Vector2 size)
     {
-        var texture = Plugin.TextureProvider.GetFromFile(vinePath).GetWrapOrDefault();
-        if (texture is null) return;
-
         var drawList = ImGui.GetWindowDrawList();
-        var ornamentSize = new Vector2(126, 126);
-        var tint = ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 0.86f));
-        drawList.AddImage(texture.Handle, position, position + ornamentSize,
-            new Vector2(0, 1), new Vector2(1, 0), tint);
-        drawList.AddImage(texture.Handle,
-            position + new Vector2(size.X - ornamentSize.X, 0),
-            position + new Vector2(size.X, ornamentSize.Y),
-            Vector2.One, Vector2.Zero, tint);
-        drawList.AddImage(texture.Handle,
-            position + new Vector2(0, size.Y - ornamentSize.Y),
-            position + new Vector2(ornamentSize.X, size.Y),
-            Vector2.Zero, Vector2.One, tint);
-        drawList.AddImage(texture.Handle,
-            position + size - ornamentSize,
-            position + size,
-            new Vector2(1, 0), new Vector2(0, 1), tint);
+        var topTexture = Plugin.TextureProvider.GetFromFile(panelTopPath).GetWrapOrDefault();
+        if (topTexture is not null)
+        {
+            var topWidth = MathF.Min(390f, size.X * 0.58f);
+            var topSize = new Vector2(topWidth, topWidth * 0.5625f);
+            drawList.AddImage(topTexture.Handle, position, position + topSize,
+                Vector2.Zero, Vector2.One,
+                ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 0.66f)));
+        }
+
+        var bottomTexture = Plugin.TextureProvider.GetFromFile(panelBottomPath).GetWrapOrDefault();
+        if (bottomTexture is not null)
+        {
+            var bottomWidth = MathF.Min(315f, size.X * 0.46f);
+            var bottomSize = new Vector2(bottomWidth, bottomWidth * 0.5625f);
+            var bottomPosition = position + new Vector2(size.X - bottomSize.X, size.Y - bottomSize.Y);
+            drawList.AddImage(bottomTexture.Handle, bottomPosition, bottomPosition + bottomSize,
+                new Vector2(1f, 0f), new Vector2(0f, 1f),
+                ImGui.GetColorU32(new Vector4(1f, 1f, 1f, 0.78f)));
+        }
+    }
+
+    private static void DrawRightAlignedHeader(string text, Vector4 color)
+    {
+        var rightEdge = ImGui.GetWindowContentRegionMax().X - PanelGutter;
+        ImGui.SetCursorPosX(MathF.Max(ImGui.GetCursorPosX(), rightEdge - ImGui.CalcTextSize(text).X));
+        ImGui.TextColored(color, text);
     }
 
     private void StartTranslation(TranslationDirection direction, string input)

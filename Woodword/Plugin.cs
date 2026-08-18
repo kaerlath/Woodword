@@ -37,14 +37,18 @@ public sealed class Plugin : IDalamudPlugin
         var backgroundPath = Path.Combine(
             PluginInterface.AssemblyLocation.Directory?.FullName ?? string.Empty,
             "Assets", "woodword-background-v2.png");
-        var vinePath = Path.Combine(
+        var panelTopPath = Path.Combine(
             PluginInterface.AssemblyLocation.Directory?.FullName ?? string.Empty,
-            "Assets", "vine-corner.png");
+            "Assets", "panel-top-botanical.png");
+        var panelBottomPath = Path.Combine(
+            PluginInterface.AssemblyLocation.Directory?.FullName ?? string.Empty,
+            "Assets", "panel-bottom-botanical.png");
         var ravenPath = Path.Combine(
             PluginInterface.AssemblyLocation.Directory?.FullName ?? string.Empty,
             "Assets", "raven-header-v3.png");
         mainWindow = new MainWindow(
-            this, translationService, settingsWindow, backgroundPath, vinePath, ravenPath);
+            this, translationService, settingsWindow, backgroundPath,
+            panelTopPath, panelBottomPath, ravenPath);
         windowSystem.AddWindow(mainWindow);
         windowSystem.AddWindow(settingsWindow);
 
