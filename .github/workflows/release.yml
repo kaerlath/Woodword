@@ -47,8 +47,11 @@ jobs:
             exit 1
           fi
 
+      - name: Restore locked dependencies
+        run: dotnet restore Woodword/Woodword.csproj --locked-mode
+
       - name: Build packaged plugin
-        run: dotnet build Woodword/Woodword.csproj --configuration Release --locked-mode
+        run: dotnet build Woodword/Woodword.csproj --configuration Release --no-restore
 
       - name: Publish GitHub release
         shell: bash
