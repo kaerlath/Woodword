@@ -1,0 +1,16 @@
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+  <PropertyGroup>
+    <Version>0.1.0.0</Version>
+    <Author>Lynnaes Krasikaz</Author>
+    <Name>Woodword</Name>
+    <Punchline>Render words between Common and Vieran.</Punchline>
+    <Description>A focused roleplay translation tool for Common and Vieran. Open it with /woodword. Woodword never intercepts or posts chat.</Description>
+    <Tags>roleplay;translation;viera</Tags>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <WoodwordRelayToken>$(WOODWORD_RELAY_TOKEN)</WoodwordRelayToken>
+  </PropertyGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="WoodwordRelayToken" Value="$(WoodwordRelayToken)" />
+  </ItemGroup>
+</Project>

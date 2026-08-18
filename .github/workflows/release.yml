@@ -1,0 +1,54 @@
+name: Publish release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      DALAMUD_HOME: ${{ runner.temp }}/dalamud
+      WOODWORD_RELAY_TOKEN: ${{ secrets.WOODWORD_RELAY_TOKEN }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Download Dalamud SDK files
+        shell: bash
+        run: |
+          curl --fail --location --silent --show-error \
+            https://goatcorp.github.io/dalamud-distrib/latest.zip \
+            --output "${RUNNER_TEMP}/dalamud.zip"
+          mkdir --parents "${DALAMUD_HOME}"
+          unzip -q "${RUNNER_TEMP}/dalamud.zip" -d "${DALAMUD_HOME}"
+
+      - name: Require the relay token
+        shell: bash
+        run: |
+          if [ -z "${WOODWORD_RELAY_TOKEN}" ]; then
+            echo "WOODWORD_RELAY_TOKEN repository secret is missing."
+            exit 1
+          fi
+
+      - name: Build packaged plugin
+        run: dotnet build Woodword/Woodword.csproj --configuration Release --locked-mode
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "Woodword/bin/Release/Woodword/latest.zip#Woodword-${GITHUB_REF_NAME}.zip" \
+            --title "Woodword ${GITHUB_REF_NAME}" \
+            --generate-notes
