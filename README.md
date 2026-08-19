@@ -7,6 +7,8 @@ Woodword is a Dalamud roleplay utility by Lynnaes Krasikaz that renders words be
 - Common to Vieran and Vieran to Common translation
 - Resizable, forest-themed interface with wrapping multiline text
 - Manual copy action for generated Vieran text
+- One-click clearing for either translation input
+- Local-only, size-limited translation history with an in-plugin reader
 - Per-installation random client identity and relay rate limiting
 - No chat interception, automatic translation, or automatic posting
 
@@ -46,6 +48,7 @@ Then search for **Woodword** in the plugin installer.
 - Only the entered text, direction, relay token, and random installation ID are sent to the relay.
 - Character names, account information, and game chat are not accessed.
 - Woodword never posts translated text automatically.
+- Successful translation inputs and outputs are stored only in the local plugin configuration folder when history is used; the oldest entries are pruned at the configured size limit.
 
 ## Important token note
 

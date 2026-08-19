@@ -21,6 +21,7 @@ public sealed class MainWindow : Window, IDisposable
 
     private readonly Plugin plugin;
     private readonly TranslationService translationService;
+    private readonly TranslationHistoryService historyService;
     private readonly SettingsWindow settingsWindow;
     private readonly string backgroundPath;
     private readonly string panelTopPath;
@@ -45,6 +46,7 @@ public sealed class MainWindow : Window, IDisposable
     public MainWindow(
         Plugin plugin,
         TranslationService translationService,
+        TranslationHistoryService historyService,
         SettingsWindow settingsWindow,
         string backgroundPath,
         string panelTopPath,
@@ -54,6 +56,7 @@ public sealed class MainWindow : Window, IDisposable
     {
         this.plugin = plugin;
         this.translationService = translationService;
+        this.historyService = historyService;
         this.settingsWindow = settingsWindow;
         this.backgroundPath = backgroundPath;
         this.panelTopPath = panelTopPath;
@@ -261,6 +264,16 @@ public sealed class MainWindow : Window, IDisposable
         if (ImGui.Button($"{actionLabel}##{id}")) StartTranslation(direction, NormalizeForTranslation(input));
         ImGui.EndDisabled();
 
+        ImGui.SameLine();
+        ImGui.BeginDisabled(busy || string.IsNullOrEmpty(input));
+        if (ImGui.Button($"Clear##{id}"))
+        {
+            input = string.Empty;
+            inputActive = false;
+            status = "The offered words have been released.";
+        }
+        ImGui.EndDisabled();
+
         if (showCopy)
         {
             ImGui.SameLine();
@@ -369,6 +382,20 @@ public sealed class MainWindow : Window, IDisposable
                     vieranStatus = "The meaning returns in Common.";
                 }
             });
+            try
+            {
+                await historyService.AppendAsync(
+                    direction, input, result, plugin.Configuration.HistoryMaxMegabytes,
+                    lifetimeCancellation.Token);
+            }
+            catch (OperationCanceledException) when (disposed || lifetimeCancellation.IsCancellationRequested)
+            {
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.Error(ex, "Could not record Woodword translation history");
+                QueueStatus(direction, "The meaning returned, but its echo could not be recorded.");
+            }
         }
         catch (OperationCanceledException)
         {
