@@ -3,7 +3,7 @@
     "Author": "Lynnaes Krasikaz",
     "Name": "Woodword",
     "InternalName": "Woodword",
-    "AssemblyVersion": "0.3.0.0",
+    "AssemblyVersion": "0.3.1.0",
     "Description": "A focused roleplay translation tool for Common and Vieran. Open it with /woodword. Woodword never intercepts or posts chat.",
     "ApplicableVersion": "any",
     "RepoUrl": "https://github.com/kaerlath/Woodword",
@@ -22,7 +22,7 @@
     "AcceptsFeedback": true,
     "IsHide": false,
     "IsTestingExclusive": false,
-    "DownloadLinkInstall": "https://github.com/kaerlath/Woodword/releases/download/v0.3.0/latest.zip",
-    "DownloadLinkUpdate": "https://github.com/kaerlath/Woodword/releases/download/v0.3.0/latest.zip"
+    "DownloadLinkInstall": "https://github.com/kaerlath/Woodword/releases/download/v0.3.1/latest.zip",
+    "DownloadLinkUpdate": "https://github.com/kaerlath/Woodword/releases/download/v0.3.1/latest.zip"
   }
 ]

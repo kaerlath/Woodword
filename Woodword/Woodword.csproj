@@ -1,6 +1,6 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.3.0.0</Version>
+    <Version>0.3.1.0</Version>
     <Author>Lynnaes Krasikaz</Author>
     <RepoUrl>https://github.com/kaerlath/Woodword</RepoUrl>
     <IconUrl>https://raw.githubusercontent.com/kaerlath/Woodword/main/images/icon.png</IconUrl>

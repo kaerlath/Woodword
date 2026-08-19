@@ -88,10 +88,10 @@ public sealed class MainWindow : Window, IDisposable
 
         var available = ImGui.GetContentRegionAvail();
         var panelHeight = MathF.Max(210, (available.Y - ImGui.GetStyle().ItemSpacing.Y) / 2);
-        DrawPanel("COMMON  \u2192  VIERAN", "Words offered in Common", "Rendered in the Vieran tongue",
+        DrawPanel("COMMON  \u2192  VIERAN", "Words offered in Common", "Common rendered in the Vieran tongue",
             "Render into Vieran", "common", ref commonInput, ref vieranOutput,
             ref commonStatus, ref commonBusy, TranslationDirection.CommonToVieran, panelHeight, true);
-        DrawPanel("VIERAN  \u2192  COMMON", "Words offered in Vieran", "Meaning returned in Common",
+        DrawPanel("VIERAN  \u2192  COMMON", "Words offered in Vieran", "Vieran meaning returned in Common",
             "Translate into Common", "vieran", ref vieranInput, ref commonOutput,
             ref vieranStatus, ref vieranBusy, TranslationDirection.VieranToCommon, panelHeight, false);
         PopWoodwordControls();
@@ -223,6 +223,27 @@ public sealed class MainWindow : Window, IDisposable
             new Vector2(-PanelGutter, boxHeight), ImGuiInputTextFlags.CallbackEdit,
             data => WrapDuringEdit(data, inputWidth));
         inputActive = ImGui.IsItemActive();
+        var fieldMin = ImGui.GetItemRectMin();
+        var fieldMax = ImGui.GetItemRectMax();
+        var fieldDrawList = ImGui.GetWindowDrawList();
+        if (string.IsNullOrWhiteSpace(UnwrapDisplayText(input)))
+        {
+            fieldDrawList.AddText(
+                fieldMin + new Vector2(12f, 10f),
+                ImGui.GetColorU32(new Vector4(0.68f, 0.76f, 0.64f, inputActive ? 0.72f : 0.55f)),
+                "What do you wish to say?");
+        }
+        if (inputActive)
+        {
+            fieldDrawList.AddRect(
+                fieldMin - new Vector2(2f), fieldMax + new Vector2(2f),
+                ImGui.GetColorU32(new Vector4(0.27f, 0.58f, 0.57f, 0.2f)),
+                5f, ImDrawFlags.None, 3f);
+            fieldDrawList.AddRect(
+                fieldMin - Vector2.One, fieldMax + Vector2.One,
+                ImGui.GetColorU32(new Vector4(0.38f, 0.76f, 0.72f, 0.92f)),
+                4f, ImDrawFlags.None, 1.25f);
+        }
         if (!inputActive)
         {
             input = WrapForDisplay(input, inputWidth);
@@ -269,6 +290,14 @@ public sealed class MainWindow : Window, IDisposable
     private void DrawPanelBotanicals(Vector2 position, Vector2 size)
     {
         var drawList = ImGui.GetWindowDrawList();
+        drawList.AddRect(
+            position + new Vector2(7f),
+            position + size - new Vector2(7f),
+            ImGui.GetColorU32(new Vector4(0.48f, 0.62f, 0.48f, 0.48f)),
+            5f,
+            ImDrawFlags.None,
+            1.4f);
+
         var topTexture = Plugin.TextureProvider.GetFromFile(panelTopPath).GetWrapOrDefault();
         if (topTexture is not null)
         {
