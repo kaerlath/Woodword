@@ -17,10 +17,13 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
     [PluginService] internal static ITextureProvider TextureProvider { get; private set; } = null!;
+    [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
 
     private readonly WindowSystem windowSystem = new("Woodword");
+    private readonly CancellationTokenSource lifetimeCancellation = new();
     private readonly TranslationService translationService;
     private readonly TranslationHistoryService historyService;
+    private readonly LiveChatTranslationService liveChatService;
     private readonly MainWindow mainWindow;
     private readonly SettingsWindow settingsWindow;
     private readonly HistoryWindow historyWindow;
@@ -36,6 +39,9 @@ public sealed class Plugin : IDalamudPlugin
         SaveConfiguration();
 
         translationService = new TranslationService();
+        liveChatService = new LiveChatTranslationService(
+            ChatGui, translationService, GetRelayToken, () => Configuration.ClientId,
+            () => Configuration.LiveAccessCode);
         historyService = new TranslationHistoryService(Path.Combine(
             PluginInterface.GetPluginConfigDirectory(), "translation-history.jsonl"));
         historyWindow = new HistoryWindow(historyService);
@@ -53,7 +59,7 @@ public sealed class Plugin : IDalamudPlugin
             PluginInterface.AssemblyLocation.Directory?.FullName ?? string.Empty,
             "Assets", "raven-header-v3.png");
         mainWindow = new MainWindow(
-            this, translationService, historyService, settingsWindow, backgroundPath,
+            this, translationService, historyService, liveChatService, settingsWindow, backgroundPath,
             panelTopPath, panelBottomPath, ravenPath);
         windowSystem.AddWindow(mainWindow);
         windowSystem.AddWindow(settingsWindow);
@@ -66,10 +72,39 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.Draw += windowSystem.Draw;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
         PluginInterface.UiBuilder.OpenConfigUi += ToggleSettingsUi;
+        if (Configuration.LiveChatTranslationEnabled && !string.IsNullOrWhiteSpace(Configuration.LiveAccessCode))
+            _ = ValidateAndSetLiveChatListeningAsync(true, Configuration.LiveAccessCode);
     }
 
     internal void SaveConfiguration() => PluginInterface.SavePluginConfig(Configuration);
     internal void OpenHistory() => historyWindow.OpenAndRefresh();
+    internal string GetRelayToken() => string.IsNullOrWhiteSpace(Configuration.RelayToken)
+        ? BuildInformation.BundledRelayToken
+        : Configuration.RelayToken;
+    internal bool IsLiveChatListening => liveChatService.IsEnabled;
+    internal void DisableLiveChatListening()
+    {
+        Configuration.LiveChatTranslationEnabled = false;
+        SaveConfiguration();
+        liveChatService.SetEnabled(false);
+    }
+    internal async Task<string> ValidateAndSetLiveChatListeningAsync(bool enabled, string code)
+    {
+        if (!enabled)
+        {
+            DisableLiveChatListening();
+            return "Live listening is paused.";
+        }
+
+        var trimmedCode = code.Trim();
+        await translationService.ValidateLiveAccessAsync(
+            GetRelayToken(), Configuration.ClientId, trimmedCode, lifetimeCancellation.Token);
+        Configuration.LiveAccessCode = trimmedCode;
+        Configuration.LiveChatTranslationEnabled = true;
+        SaveConfiguration();
+        liveChatService.SetEnabled(true);
+        return "The validation code was accepted. The Wood may now listen.";
+    }
     internal async Task EnforceHistoryLimitAsync()
     {
         try
@@ -89,6 +124,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         if (disposed) return;
         disposed = true;
+        lifetimeCancellation.Cancel();
         PluginInterface.UiBuilder.Draw -= windowSystem.Draw;
         PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;
         PluginInterface.UiBuilder.OpenConfigUi -= ToggleSettingsUi;
@@ -97,7 +133,9 @@ public sealed class Plugin : IDalamudPlugin
         mainWindow.Dispose();
         settingsWindow.Dispose();
         historyWindow.Dispose();
+        liveChatService.Dispose();
         historyService.Dispose();
         translationService.Dispose();
+        lifetimeCancellation.Dispose();
     }
 }

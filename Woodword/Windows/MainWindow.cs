@@ -22,12 +22,14 @@ public sealed class MainWindow : Window, IDisposable
     private readonly Plugin plugin;
     private readonly TranslationService translationService;
     private readonly TranslationHistoryService historyService;
+    private readonly LiveChatTranslationService liveChatService;
     private readonly SettingsWindow settingsWindow;
     private readonly string backgroundPath;
     private readonly string panelTopPath;
     private readonly string panelBottomPath;
     private readonly string ravenPath;
     private readonly ConcurrentQueue<Action> uiUpdates = new();
+    private readonly List<LiveTranslationEntry> liveTranslations = new();
     private readonly CancellationTokenSource lifetimeCancellation = new();
     private CancellationTokenSource? commonRequestCancellation;
     private CancellationTokenSource? vieranRequestCancellation;
@@ -41,12 +43,14 @@ public sealed class MainWindow : Window, IDisposable
     private bool vieranBusy;
     private bool commonInputActive;
     private bool vieranInputActive;
+    private string liveStatus = "Live listening is paused.";
     private bool disposed;
 
     public MainWindow(
         Plugin plugin,
         TranslationService translationService,
         TranslationHistoryService historyService,
+        LiveChatTranslationService liveChatService,
         SettingsWindow settingsWindow,
         string backgroundPath,
         string panelTopPath,
@@ -57,11 +61,14 @@ public sealed class MainWindow : Window, IDisposable
         this.plugin = plugin;
         this.translationService = translationService;
         this.historyService = historyService;
+        this.liveChatService = liveChatService;
         this.settingsWindow = settingsWindow;
         this.backgroundPath = backgroundPath;
         this.panelTopPath = panelTopPath;
         this.panelBottomPath = panelBottomPath;
         this.ravenPath = ravenPath;
+        liveChatService.TranslationReceived += OnLiveTranslationReceived;
+        liveChatService.StatusChanged += OnLiveStatusChanged;
         Size = new Vector2(780, 690);
         SizeCondition = ImGuiCond.FirstUseEver;
         SizeConstraints = new WindowSizeConstraints
@@ -89,16 +96,93 @@ public sealed class MainWindow : Window, IDisposable
         if (ImGui.Button("Settings")) settingsWindow.IsOpen = true;
         DrawOrnamentalRule();
 
-        var available = ImGui.GetContentRegionAvail();
-        var panelHeight = MathF.Max(210, (available.Y - ImGui.GetStyle().ItemSpacing.Y) / 2);
-        DrawPanel("COMMON  \u2192  VIERAN", "Words offered in Common", "Common rendered in the Vieran tongue",
-            "Render into Vieran", "common", ref commonInput, ref vieranOutput,
-            ref commonStatus, ref commonBusy, TranslationDirection.CommonToVieran, panelHeight, true);
-        DrawPanel("VIERAN  \u2192  COMMON", "Words offered in Vieran", "Vieran meaning returned in Common",
-            "Translate into Common", "vieran", ref vieranInput, ref commonOutput,
-            ref vieranStatus, ref vieranBusy, TranslationDirection.VieranToCommon, panelHeight, false);
+        if (ImGui.BeginTabBar("##WoodwordTabs"))
+        {
+            if (ImGui.BeginTabItem("Translator"))
+            {
+                var available = ImGui.GetContentRegionAvail();
+                var panelHeight = MathF.Max(210, (available.Y - ImGui.GetStyle().ItemSpacing.Y) / 2);
+                DrawPanel("COMMON  \u2192  VIERAN", "Words offered in Common", "Common rendered in the Vieran tongue",
+                    "Render into Vieran", "common", ref commonInput, ref vieranOutput,
+                    ref commonStatus, ref commonBusy, TranslationDirection.CommonToVieran, panelHeight, true);
+                DrawPanel("VIERAN  \u2192  COMMON", "Words offered in Vieran", "Vieran meaning returned in Common",
+                    "Translate into Common", "vieran", ref vieranInput, ref commonOutput,
+                    ref vieranStatus, ref vieranBusy, TranslationDirection.VieranToCommon, panelHeight, false);
+                ImGui.EndTabItem();
+            }
+
+            var liveLabel = liveChatService.IsEnabled ? "Live Vieran  \u25cf" : "Live Vieran";
+            if (ImGui.BeginTabItem(liveLabel))
+            {
+                DrawLiveTranslations();
+                ImGui.EndTabItem();
+            }
+            ImGui.EndTabBar();
+        }
         PopWoodwordControls();
     }
+
+    private void DrawLiveTranslations()
+    {
+        var listening = liveChatService.IsEnabled;
+        ImGui.TextColored(listening ? PaleMoss : ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled],
+            listening ? "LISTENING" : "PAUSED");
+        ImGui.SameLine();
+        ImGui.TextWrapped(liveStatus);
+
+        if (ImGui.Button(listening ? "Pause listening" : "Unlock in Settings"))
+        {
+            if (listening) plugin.DisableLiveChatListening();
+            else settingsWindow.IsOpen = true;
+        }
+        ImGui.SameLine();
+        ImGui.BeginDisabled(liveTranslations.Count == 0);
+        if (ImGui.Button("Clear live feed")) liveTranslations.Clear();
+        ImGui.EndDisabled();
+        ImGui.SameLine();
+        ImGui.TextDisabled("Say and custom emotes only  |  current session  |  newest 100");
+        ImGui.Separator();
+
+        ImGui.PushStyleColor(ImGuiCol.ChildBg, DeepWood);
+        if (ImGui.BeginChild("##LiveTranslationFeed", new Vector2(0, 0), true))
+        {
+            if (liveTranslations.Count == 0)
+            {
+                ImGui.TextDisabled(listening
+                    ? "The Wood has not yet heard Vieran words nearby."
+                    : "Begin listening when you wish the Wood to hear nearby Vieran words.");
+            }
+            else
+            {
+                foreach (var entry in liveTranslations)
+                {
+                    ImGui.TextColored(Gold, $"{entry.Timestamp:t}  {entry.Channel}");
+                    if (!string.IsNullOrWhiteSpace(entry.Sender))
+                    {
+                        ImGui.SameLine();
+                        ImGui.TextColored(PaleMoss, entry.Sender);
+                    }
+                    ImGui.TextWrapped(entry.VieranText);
+                    ImGui.Indent(14f);
+                    ImGui.TextColored(PaleMoss, "Common meaning");
+                    ImGui.TextWrapped(entry.CommonText);
+                    ImGui.Unindent(14f);
+                    ImGui.Separator();
+                }
+            }
+        }
+        ImGui.EndChild();
+        ImGui.PopStyleColor();
+    }
+
+    private void OnLiveTranslationReceived(LiveTranslationEntry entry) => uiUpdates.Enqueue(() =>
+    {
+        liveTranslations.Insert(0, entry);
+        if (liveTranslations.Count > 100)
+            liveTranslations.RemoveRange(100, liveTranslations.Count - 100);
+    });
+
+    private void OnLiveStatusChanged(string status) => uiUpdates.Enqueue(() => liveStatus = status);
 
     private void DrawRavenHeaderIcon()
     {
@@ -367,7 +451,7 @@ public sealed class MainWindow : Window, IDisposable
         try
         {
             var result = await translationService.TranslateAsync(
-                input, direction, GetRelayToken(), plugin.Configuration.ClientId, token);
+                input, direction, plugin.GetRelayToken(), plugin.Configuration.ClientId, token);
             if (disposed || token.IsCancellationRequested) return;
             uiUpdates.Enqueue(() =>
             {
@@ -423,10 +507,6 @@ public sealed class MainWindow : Window, IDisposable
             }
         }
     }
-
-    private string GetRelayToken() => string.IsNullOrWhiteSpace(plugin.Configuration.RelayToken)
-        ? BuildInformation.BundledRelayToken
-        : plugin.Configuration.RelayToken;
 
     private static string NormalizeForTranslation(string text) => string.Join("\n\n",
         text.Replace("\r", string.Empty)
@@ -527,6 +607,8 @@ public sealed class MainWindow : Window, IDisposable
     {
         if (disposed) return;
         disposed = true;
+        liveChatService.TranslationReceived -= OnLiveTranslationReceived;
+        liveChatService.StatusChanged -= OnLiveStatusChanged;
         lifetimeCancellation.Cancel();
         commonRequestCancellation?.Cancel();
         vieranRequestCancellation?.Cancel();

@@ -1,12 +1,12 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.4.0.0</Version>
+    <Version>0.5.0.0</Version>
     <Author>Lynnaes Krasikaz</Author>
     <RepoUrl>https://github.com/kaerlath/Woodword</RepoUrl>
     <IconUrl>https://raw.githubusercontent.com/kaerlath/Woodword/main/images/icon.png</IconUrl>
     <Name>Woodword</Name>
     <Punchline>Render words between Common and Vieran.</Punchline>
-    <Description>A focused roleplay translation tool for Common and Vieran. Open it with /woodword. Woodword never intercepts or posts chat.</Description>
+    <Description>A focused roleplay translation tool for Common and Vieran, with optional local detection of Vieran in Say and custom emotes. Open it with /woodword. Woodword never changes or posts chat.</Description>
     <Tags>roleplay;translation;viera</Tags>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

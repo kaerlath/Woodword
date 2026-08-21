@@ -9,8 +9,9 @@ Woodword is a Dalamud roleplay utility by Lynnaes Krasikaz that renders words be
 - Manual copy action for generated Vieran text
 - One-click clearing for either translation input
 - Local-only, size-limited translation history with an in-plugin reader
+- Optional, access-code protected live Vieran-to-Common feed for Say and custom emotes, disabled by default
 - Per-installation random client identity and relay rate limiting
-- No chat interception, automatic translation, or automatic posting
+- No chat modification or automatic posting
 
 Open the window in game with `/woodword`.
 
@@ -44,9 +45,11 @@ Then search for **Woodword** in the plugin installer.
 
 ## Privacy and behavior
 
-- Translation occurs only after the user presses a translation button.
-- Only the entered text, direction, relay token, and random installation ID are sent to the relay.
-- Character names, account information, and game chat are not accessed.
+- Manual translation occurs only after the user presses a translation button.
+- Live listening is disabled by default and observes only Say and custom emotes when explicitly enabled.
+- The relay must validate an author-issued live-access code before listening can begin, and it rechecks that code on every live translation request.
+- Live messages are checked locally first; only text conservatively identified as likely Icelandic is sent to the relay for translation.
+- Other channels and messages that do not pass that local check are not sent. The live feed keeps only its newest 100 translations in memory for the current session.
 - Woodword never posts translated text automatically.
 - Successful translation inputs and outputs are stored only in the local plugin configuration folder when history is used; the oldest entries are pruned at the configured size limit.
 

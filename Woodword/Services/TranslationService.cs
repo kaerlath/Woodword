@@ -10,6 +10,7 @@ public sealed class TranslationService : IDisposable
 {
     public const int MaximumTextLength = 4000;
     private static readonly Uri RelayUri = new("https://woodword-relay.kaerlath.workers.dev/translate");
+    private static readonly Uri LiveValidationUri = new("https://woodword-relay.kaerlath.workers.dev/live/validate");
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient httpClient;
     private bool disposed;
@@ -25,7 +26,8 @@ public sealed class TranslationService : IDisposable
         TranslationDirection direction,
         string relayToken,
         string clientId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? liveAccessCode = null)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
 
@@ -42,6 +44,11 @@ public sealed class TranslationService : IDisposable
         using var request = new HttpRequestMessage(HttpMethod.Post, RelayUri);
         request.Headers.TryAddWithoutValidation("X-Woodword-Token", relayToken.Trim());
         request.Headers.TryAddWithoutValidation("X-Woodword-Client", clientId);
+        if (!string.IsNullOrWhiteSpace(liveAccessCode))
+        {
+            request.Headers.TryAddWithoutValidation("X-Woodword-Request", "live");
+            request.Headers.TryAddWithoutValidation("X-Woodword-Live-Code", liveAccessCode.Trim());
+        }
         request.Content = JsonContent.Create(
             new TranslationRequest(trimmed, direction.ToWireValue()),
             options: JsonOptions);
@@ -84,6 +91,52 @@ public sealed class TranslationService : IDisposable
                 _ when (int)response.StatusCode >= 500 => "The Wood has fallen silent for the moment.",
                 _ => "The Wood could not render those words.",
             });
+        }
+    }
+
+    public async Task ValidateLiveAccessAsync(
+        string relayToken, string clientId, string liveAccessCode, CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        if (string.IsNullOrWhiteSpace(liveAccessCode))
+            throw new TranslationException("Enter a live-listening validation code first.");
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, LiveValidationUri);
+        request.Headers.TryAddWithoutValidation("X-Woodword-Token", relayToken.Trim());
+        request.Headers.TryAddWithoutValidation("X-Woodword-Client", clientId);
+        request.Headers.TryAddWithoutValidation("X-Woodword-Live-Code", liveAccessCode.Trim());
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TranslationException("The Wood listened too long while examining that code.");
+        }
+        catch (HttpRequestException)
+        {
+            throw new TranslationException("The Wood cannot be reached to examine that code.");
+        }
+
+        using (response)
+        {
+            if (response.IsSuccessStatusCode) return;
+            TranslationResponse? payload = null;
+            try
+            {
+                payload = await response.Content.ReadFromJsonAsync<TranslationResponse>(JsonOptions, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (JsonException) { }
+            throw new TranslationException(payload?.Message ?? (response.StatusCode switch
+            {
+                HttpStatusCode.Forbidden => "That validation code is not recognized by the Wood.",
+                HttpStatusCode.Unauthorized => "The Wood does not know this installation's voice.",
+                _ => "The Wood could not examine that validation code.",
+            }));
         }
     }
 
